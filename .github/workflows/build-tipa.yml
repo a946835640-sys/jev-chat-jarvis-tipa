@@ -21,12 +21,13 @@ jobs:
       - name: Build (unsigned, for TrollStore)
         run: |
           cd src
-          xcodebuild -project JevJarvis.xcodeproj -target JevJarvis \
+          set -o pipefail
+          xcodebuild -project JevJarvis.xcodeproj -scheme JevJarvis \
             -configuration Release -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            build 2>&1 | tail -n 60
+            build 2>&1 | tail -n 80
 
       - name: Package .tipa
         run: |
