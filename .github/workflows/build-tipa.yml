@@ -1,0 +1,51 @@
+name: Build TIPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Clone upstream source
+        run: git clone --depth 1 https://github.com/jev-chat/jev-chat-jarvis-ios.git src
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd src
+          xcodegen generate
+
+      - name: Build (unsigned, for TrollStore)
+        run: |
+          cd src
+          xcodebuild -project JevJarvis.xcodeproj -target JevJarvis \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tail -n 60
+
+      - name: Package .tipa
+        run: |
+          APP=$(find src/build -type d -name "JevJarvis.app" | head -1)
+          echo "APP=$APP"
+          test -n "$APP"
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry JevJarvis.tipa Payload
+          ls -lh JevJarvis.tipa
+
+      - name: Publish to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="tipa-$(date +%Y%m%d)"
+          COMMIT=$(cd src && git rev-parse --short HEAD)
+          gh release create "$TAG" JevJarvis.tipa \
+            --title "JevJarvis TrollStore 包 $TAG" \
+            --notes "免签名构建，TrollStore 直接安装。上游 commit: $COMMIT" \
+            --clobber || gh release upload "$TAG" JevJarvis.tipa --clobber
