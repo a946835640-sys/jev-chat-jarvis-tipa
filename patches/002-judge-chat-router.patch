@@ -124,7 +124,7 @@ index aabc0b2..2ff525b 100644
          if let d = v as? Double { return d }
          if let i = v as? Int { return Double(i) }
 diff --git a/Shared/JevModel.swift b/Shared/JevModel.swift
-index 987a46d..df8ef38 100644
+index 987a46d..72ddf1a 100644
 --- a/Shared/JevModel.swift
 +++ b/Shared/JevModel.swift
 @@ -57,7 +57,7 @@ struct JudgePreset: Identifiable, Hashable {
@@ -155,10 +155,10 @@ index 987a46d..df8ef38 100644
 +        var stored: JevConfig?
 +        if let data = try? Data(contentsOf: groupConfigURL) {
 +            stored = try? JSONDecoder().decode(JevConfig.self, from: data)
-+        }
+         }
 +        if stored == nil, let data = defaults.data(forKey: configKey) {
 +            stored = try? JSONDecoder().decode(JevConfig.self, from: data)
-         }
++        }
 +        guard var cfg = stored else { return JevConfig() }
          if cfg.genBase == removedGenerationBase {
              let preset = ProviderPreset.all.first { $0.id == "zhipu" }
@@ -176,7 +176,7 @@ index 987a46d..df8ef38 100644
      }
  
      static func loadKeyboardStatus() -> KeyboardStatus? {
-@@ -175,6 +187,75 @@ enum JevStore {
+@@ -175,6 +187,86 @@ enum JevStore {
          }
      }
  
@@ -232,21 +232,32 @@ index 987a46d..df8ef38 100644
 +        return s.isEmpty ? nil : s
 +    }
 +
-+    /// 迁移：v8 的单摘要 → 名为「默认」的档案并设为当前使用（幂等，老用户无感升级）。
++    /// 迁移：v8 的单摘要 → 名为「默认」的档案。**严格一次性**（打标记 + 删旧键）：
++    /// 旧键若残留，任何一次空读都会重新触发迁移、把档案文件覆盖成只剩"默认"——这就是
++    /// 早期版本档案混乱被覆盖的根因。
 +    static func migrateLegacyContextSummaryIfNeeded() {
-+        guard contextProfiles.isEmpty,
-+              let legacy = defaults.string(forKey: "jev.context.summary.v1"),
-+              !legacy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-+        let p = ContextProfile(name: "默认", summary: legacy, updatedAt: Date())
-+        saveContextProfiles([p])
-+        if activeContextProfileID == nil { activeContextProfileID = p.id }
++        guard defaults.string(forKey: "jev.context.migrated.v1") == nil else { return }
++        defer { defaults.set("1", forKey: "jev.context.migrated.v1") }
++        if !contextProfiles.isEmpty { return }
++        if let legacy = defaults.string(forKey: "jev.context.summary.v1"),
++           !legacy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
++            let p = ContextProfile(name: "默认", summary: legacy, updatedAt: Date())
++            saveContextProfiles([p])
++            if activeContextProfileID == nil { activeContextProfileID = p.id }
++        }
++        defaults.removeObject(forKey: "jev.context.summary.v1")
 +    }
 +
-+    /// 按聊天对象自动匹配：把档案备注名设成对方的微信昵称/备注，粘贴的记录里出现
-+    /// 该名字（合并转发行首就是「昵称：」）就自动切到对应档案。
-+    static func autoMatchContextProfile(in text: String) {
-+        guard let p = contextProfiles.first(where: { !$0.name.isEmpty && text.contains($0.name) }) else { return }
-+        if activeContextProfileID != p.id { activeContextProfileID = p.id }
++    /// 自动匹配建议：只在明确命中时返回。转发块（≥2 行）要求名字出现在行首（行首就是
++    /// 发送者昵称）；单条消息无发送者信息，仅在名字出现在正文里才算命中。
++    /// 返回 nil = 无建议，键盘保持当前选择不动。
++    static func suggestContextProfile(in text: String) -> ContextProfile? {
++        let lines = text.split(whereSeparator: \.isNewline)
++        for p in contextProfiles where !p.name.isEmpty {
++            if lines.count >= 2, lines.contains(where: { $0.hasPrefix(p.name) }) { return p }
++            if lines.count < 2, text.contains(p.name) { return p }
++        }
++        return nil
 +    }
 +
      /// 密钥展示用掩码

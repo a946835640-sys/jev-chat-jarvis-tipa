@@ -1,5 +1,5 @@
 diff --git a/App/Sources/JevJarvisApp.swift b/App/Sources/JevJarvisApp.swift
-index 8336e44..078108d 100644
+index 8336e44..23c3a23 100644
 --- a/App/Sources/JevJarvisApp.swift
 +++ b/App/Sources/JevJarvisApp.swift
 @@ -1,4 +1,5 @@
@@ -17,7 +17,7 @@ index 8336e44..078108d 100644
                  PlaygroundView()
                      .tabItem { Label(jevLocalized(store.language, zh: "试一试", en: "Try it"), systemImage: "flask") }
              }
-@@ -51,3 +54,196 @@ struct JevJarvisApp: App {
+@@ -51,3 +54,233 @@ struct JevJarvisApp: App {
          }
      }
  }
@@ -139,14 +139,34 @@ index 8336e44..078108d 100644
 +                Text(notice).font(.caption).foregroundStyle(.secondary)
 +            }
 +            Button {
-+                summarize(idx)
++                summarize(idx, merge: false)
 +            } label: {
 +                HStack {
 +                    Image(systemName: "wand.and.stars")
-+                    Text(jevLocalized(store.language, zh: "从聊天记录生成摘要", en: "Summarize from chat history"))
++                    Text(jevLocalized(store.language, zh: "从聊天记录重新生成摘要", en: "Regenerate summary"))
 +                }
 +            }
 +            .disabled(busy || rawInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
++            Button {
++                summarize(idx, merge: true)
++            } label: {
++                HStack {
++                    Image(systemName: "arrow.triangle.merge")
++                    Text(jevLocalized(store.language, zh: "用新记录合并更新（保留旧摘要）", en: "Merge update"))
++                }
++            }
++            .disabled(busy || rawInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
++            Button {
++                activeID = editingID
++                JevStore.activeContextProfileID = editingID
++            } label: {
++                HStack {
++                    Image(systemName: activeID == editingID ? "checkmark.circle.fill" : "checkmark.circle")
++                    Text(activeID == editingID
++                         ? jevLocalized(store.language, zh: "当前使用中", en: "Active")
++                         : jevLocalized(store.language, zh: "设为当前使用", en: "Set as active"))
++                }
++            }
 +            TextEditor(text: $rawInput)
 +                .frame(minHeight: 80)
 +                .font(.callout)
@@ -179,20 +199,37 @@ index 8336e44..078108d 100644
 +        persist()
 +    }
 +
-+    private func summarize(_ idx: Int) {
++    private func summarize(_ idx: Int, merge: Bool) {
 +        let raw = String(rawInput.trimmingCharacters(in: .whitespacesAndNewlines).prefix(6000))
 +        guard !raw.isEmpty else { return }
 +        busy = true
 +        notice = nil
-+        let prompt = """
-+        下面是一段聊天记录。请把它压缩成一份不超过 200 字的「关系摘要」，作为后续针对单条新消息生成回复时的背景信息。要求：
++        let rules = """
 +        1. 只输出摘要正文：不要标题、不要序号、不要任何解释。
 +        2. 覆盖：对方是谁/怎么称呼、关系与当前氛围、最近在聊什么、有没有没聊完的话题或约定、雷区和注意点、两人的梗或惯用称呼。
-+        3. 平实的陈述句，人名和称呼保留原样。
-+
-+        聊天记录：
-+        \(raw)
++        3. 平实的陈述句，人名和称呼保留原样。不超过 200 字。
 +        """
++        let prompt: String
++        if merge {
++            let old = profiles.indices.contains(idx) ? profiles[idx].summary : ""
++            prompt = """
++            下面是一份已有的「关系摘要」和一段更新的聊天记录。请把新记录里的新信息融进摘要，输出更新后的完整摘要（仍不超过 200 字）：仍然有效的内容保留，已经过时的（如已完成的约定）删除或改写。\(rules)
++
++            已有摘要：
++            \(old)
++
++            更新的聊天记录：
++            \(raw)
++            """
++        } else {
++            prompt = """
++            下面是一段聊天记录。请把它压缩成一份「关系摘要」，作为后续针对单条新消息生成回复时的背景信息。要求：
++            \(rules)
++
++            聊天记录：
++            \(raw)
++            """
++        }
 +        let draft = JevDraft(cfg: store.config)
 +        Task { @MainActor in
 +            defer { busy = false }
@@ -259,7 +296,7 @@ index 1de185d..9fb9600 100644
              .toolbar {
                  ToolbarItem(placement: .cancellationAction) { Button(jevLocalized(store.language, zh: "取消", en: "Cancel")) { dismiss() } }
 diff --git a/Keyboard/Sources/KeyboardViewController.swift b/Keyboard/Sources/KeyboardViewController.swift
-index 4495edc..ea26ac2 100644
+index 4495edc..62a872e 100644
 --- a/Keyboard/Sources/KeyboardViewController.swift
 +++ b/Keyboard/Sources/KeyboardViewController.swift
 @@ -17,7 +17,7 @@ final class KeyboardViewController: UIInputViewController {
@@ -365,13 +402,24 @@ index 4495edc..ea26ac2 100644
      private func gridRow(_ cells: [UIView]) -> UIStackView {
          let s = UIStackView(arrangedSubviews: cells)
          s.axis = .horizontal
-@@ -716,10 +784,14 @@ final class KeyboardViewController: UIInputViewController {
+@@ -692,6 +760,11 @@ final class KeyboardViewController: UIInputViewController {
+             setMode(.error)
+             return
+         }
++        // 自动匹配：仅当备注名明确命中（转发块行首昵称 / 单条消息正文提到）才切换
++        if let suggestion = JevStore.suggestContextProfile(in: text),
++           JevStore.activeContextProfileID != suggestion.id {
++            JevStore.activeContextProfileID = suggestion.id
++        }
+         run(message: text)
+     }
+ 
+@@ -716,10 +789,13 @@ final class KeyboardViewController: UIInputViewController {
          setMode(.loading)
          stageLabel.text = L("判断中…", "Judging…")
          let pipeline = JevPipeline(cfg: JevStore.loadConfig())
-+        // 上下文档案：按聊天对象自动匹配（备注名出现在粘贴文本里就切换），再取当前摘要
-+        JevStore.migrateLegacyContextSummaryIfNeeded()
-+        JevStore.autoMatchContextProfile(in: message)
++        // 键盘端选中的档案是唯一事实源：分析一律用它（自动切换只在「分析剪贴板」
++        // 明确命中时发生，见 analyzeClipboard）
 +        let context = JevStore.activeContextSummary
  
          Task { @MainActor [weak self] in
