@@ -1,0 +1,15 @@
+diff --git a/Shared/JevPipeline.swift b/Shared/JevPipeline.swift
+index 9c06dfc..d30843d 100644
+--- a/Shared/JevPipeline.swift
++++ b/Shared/JevPipeline.swift
+@@ -130,7 +130,9 @@ final class JevPipeline {
+ 
+         // 判断落地：给排序用。等它有时间上限，别让一个卡住的上游拖住整条链路。
+         if let t = judgeTask, judgeResult == nil {
+-            judgeResult = try? await withTimeout(seconds: 4) { await t.value }
++            // 判断请求与起草并发，起草完成后再多等几秒：flash 级模型全程约 6-8 秒，
++            // 4 秒太紧，经常白等一场转盲起草。
++            judgeResult = try? await withTimeout(seconds: 8) { await t.value }
+         }
+         out.judge = judgeResult
+         if judge.isConfigured, judgeResult == nil {

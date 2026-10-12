@@ -1,8 +1,8 @@
 diff --git a/Shared/JevJudge.swift b/Shared/JevJudge.swift
-index aabc0b2..7ffcf02 100644
+index aabc0b2..2ff525b 100644
 --- a/Shared/JevJudge.swift
 +++ b/Shared/JevJudge.swift
-@@ -65,6 +65,18 @@ final class JevJudge {
+@@ -65,6 +65,20 @@ final class JevJudge {
          self.model = cfg.judgeModel.trimmingCharacters(in: .whitespaces)
      }
  
@@ -11,17 +11,19 @@ index aabc0b2..7ffcf02 100644
 +    /// 用 JSON 输出模拟 SystemOne 的 answers 形状，上层解析逻辑不变。
 +    private var useChatMode: Bool { base.lowercased().contains("openrouter.ai") }
 +
-+    /// 旧配置里存的退役模型名统一映射到现役 router。
++    /// 旧配置里的退役模型名统一映射到快速非思考模型：jev-router 会随机路由到思考型
++    /// 模型（一次判断动辄十几秒还常超时转盲起草）；意图/风险分类用 flash 级足够，
++    /// 实测约 650 tokens、单次成本忽略不计。
 +    private var chatModel: String {
 +        let m = model.lowercased()
-+        if m.contains("jev") && !m.contains("router") { return "typesafe/jev-router" }
++        if m.contains("jev") { return "deepseek/deepseek-v4-flash" }
 +        return model
 +    }
 +
      var isConfigured: Bool { !key.isEmpty && !base.isEmpty && !model.isEmpty }
  
      // MARK: URL 拼接（与 macOS 版 #42 单一规则一致）
-@@ -161,7 +173,8 @@ final class JevJudge {
+@@ -161,7 +175,8 @@ final class JevJudge {
      // MARK: transport
  
      private func post(_ payload: [String: Any], stage: String) async throws -> [String: Any] {
@@ -31,7 +33,7 @@ index aabc0b2..7ffcf02 100644
              payload,
              url: Self.requestURL(base),
              headers: [
-@@ -173,6 +186,89 @@ final class JevJudge {
+@@ -173,6 +188,89 @@ final class JevJudge {
          )
      }
  
@@ -70,7 +72,7 @@ index aabc0b2..7ffcf02 100644
 +                ["role": "user", "content": user],
 +            ],
 +            "temperature": 0.2,
-+            "max_tokens": 1500,
++            "max_tokens": 600,
 +        ]
 +        let data = try await JevHTTP.postJSON(
 +            chat,
@@ -122,7 +124,7 @@ index aabc0b2..7ffcf02 100644
          if let d = v as? Double { return d }
          if let i = v as? Int { return Double(i) }
 diff --git a/Shared/JevModel.swift b/Shared/JevModel.swift
-index 987a46d..b26fb82 100644
+index 987a46d..530a397 100644
 --- a/Shared/JevModel.swift
 +++ b/Shared/JevModel.swift
 @@ -57,7 +57,7 @@ struct JudgePreset: Identifiable, Hashable {
@@ -130,7 +132,47 @@ index 987a46d..b26fb82 100644
                keyHint: "api.typesafe.ai 的 key"),
          .init(id: "openrouter", name: "OpenRouter 网关",
 -              base: "https://openrouter.ai/api/alpha/decisions", model: "typesafe/jev-1.13",
-+              base: "https://openrouter.ai/api/alpha/decisions", model: "typesafe/jev-router",
++              base: "https://openrouter.ai/api/alpha/decisions", model: "deepseek/deepseek-v4-flash",
                keyHint: "OpenRouter 的 sk-or-…"),
          .init(id: "vercel", name: "Vercel AI Gateway",
                base: "https://ai-gateway.vercel.sh/v1/evaluate", model: "typesafe-ai/jev",
+@@ -140,11 +140,23 @@ enum JevStore {
+         return defaults.string(forKey: canaryKey) == stamp
+     }
+ 
++    /// 组容器里的配置文件：UserDefaults 套件在部分环境下（签名权限时序、cfprefsd 延迟落盘）
++    /// 杀掉 App 重开后读不回来。文件是原子写、即时落盘，与套件互为备份，读取优先文件。
++    private static var groupConfigURL: URL {
++        let base = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)
++            ?? FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
++        return base.appendingPathComponent("jev-config.json")
++    }
++
+     static func loadConfig() -> JevConfig {
+-        guard let data = defaults.data(forKey: configKey),
+-              var cfg = try? JSONDecoder().decode(JevConfig.self, from: data) else {
+-            return JevConfig()
++        var stored: JevConfig?
++        if let data = try? Data(contentsOf: groupConfigURL) {
++            stored = try? JSONDecoder().decode(JevConfig.self, from: data)
+         }
++        if stored == nil, let data = defaults.data(forKey: configKey) {
++            stored = try? JSONDecoder().decode(JevConfig.self, from: data)
++        }
++        guard var cfg = stored else { return JevConfig() }
+         if cfg.genBase == removedGenerationBase {
+             let preset = ProviderPreset.all.first { $0.id == "zhipu" }
+             cfg.genKind = preset?.kind ?? .openai
+@@ -158,9 +170,9 @@ enum JevStore {
+     }
+ 
+     static func saveConfig(_ cfg: JevConfig) {
+-        if let data = try? JSONEncoder().encode(cfg) {
+-            defaults.set(data, forKey: configKey)
+-        }
++        guard let data = try? JSONEncoder().encode(cfg) else { return }
++        defaults.set(data, forKey: configKey)
++        try? data.write(to: groupConfigURL, options: .atomic)
+     }
+ 
+     static func loadKeyboardStatus() -> KeyboardStatus? {
