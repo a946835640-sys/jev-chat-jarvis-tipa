@@ -9,6 +9,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout this repo (for patches)
+        uses: actions/checkout@v4
+
       - name: Clone upstream source
         run: git clone --depth 1 https://github.com/jev-chat/jev-chat-jarvis-ios.git src
 
