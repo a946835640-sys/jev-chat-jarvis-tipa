@@ -49,4 +49,4 @@ jobs:
           gh release create "$TAG" JevJarvis.tipa \
             --title "JevJarvis TrollStore 包 $TAG" \
             --notes "免签名构建，TrollStore 直接安装。上游 commit: $COMMIT" \
-            --clobber || gh release upload "$TAG" JevJarvis.tipa --clobber
+            || gh release upload "$TAG" JevJarvis.tipa --clobber
