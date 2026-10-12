@@ -43,6 +43,7 @@ jobs:
       - name: Publish to Releases
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           TAG="tipa-$(date +%Y%m%d)"
           COMMIT=$(cd src && git rev-parse --short HEAD)
