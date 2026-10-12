@@ -42,6 +42,18 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build 2>&1 | tail -n 80
 
+      - name: Embed entitlements (ldid, so App Group works under TrollStore)
+        run: |
+          brew install ldid
+          APP=$(find src/build -type d -name "JevJarvis.app" | head -1)
+          test -n "$APP"
+          ldid -S"$(pwd)/src/App/JevJarvis.entitlements" "$APP/JevJarvis"
+          ldid -S"$(pwd)/src/Keyboard/JevKeyboard.entitlements" "$APP/PlugIns/JevKeyboard.appex/JevKeyboard"
+          echo "--- App entitlements ---"
+          ldid -e "$APP/JevJarvis"
+          echo "--- Keyboard entitlements ---"
+          ldid -e "$APP/PlugIns/JevKeyboard.appex/JevKeyboard"
+
       - name: Package .tipa
         run: |
           APP=$(find src/build -type d -name "JevJarvis.app" | head -1)
