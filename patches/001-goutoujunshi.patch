@@ -1,0 +1,42 @@
+diff --git a/Shared/JevLocalization.swift b/Shared/JevLocalization.swift
+index bb46a49..2321dcf 100644
+--- a/Shared/JevLocalization.swift
++++ b/Shared/JevLocalization.swift
+@@ -64,6 +64,7 @@ func localizedToneName(_ name: String, language: JevLanguage) -> String {
+         "卑微乙方": "Humble vendor", "稳如老狗": "Calm engineer", "已读乱回": "Minimal reply",
+         "鱼塘主": "The charmer", "职场黑话": "Corporate jargon", "阴阳怪气": "Sarcastic",
+         "情绪价值": "Emotional support", "夸夸": "Hype friend", "讨好型人格": "People pleaser",
++        "狗头军师": "Doghead strategist",
+         NONE_LABEL: "Off",
+     ][name] ?? name
+ }
+@@ -92,6 +93,7 @@ func toneEnglishDescription(_ name: String) -> String {
+         "情绪价值": "Validate the other person’s feelings before offering advice or solutions.",
+         "夸夸": "Praise a specific detail warmly, then handle the practical request.",
+         "讨好型人格": "Soft and eager to please, but still clear enough to send directly.",
++        "狗头军师": "A scheming friend in your ear: mischievous but harmless tactics that are concrete enough to follow, kept within bounds.",
+     ][name] ?? (BUILTIN_TONES[name] ?? "")
+ }
+ 
+diff --git a/Shared/JevPrompts.swift b/Shared/JevPrompts.swift
+index 87476ad..08fb046 100644
+--- a/Shared/JevPrompts.swift
++++ b/Shared/JevPrompts.swift
+@@ -74,6 +74,8 @@ let BUILTIN_TONES: [String: String] = [
+     "夸夸": "像夸夸群里的金牌群友：夸人夸具体——抓住对方消息里的细节往高了夸（眼光、效率、品位都行），语气真诚热络，「绝了」「这也太强了」「服了」随手就来，可以带感叹号；夸完顺势把正事接住（该答应的答应、该给时间的给时间）。不空泛、不谄媚、不连用三个感叹号，别把夸说成阴阳怪气。",
+     // 只在 iOS 版：macOS / Windows 还没有这个话术（要同步的话记得补给 styles.py）
+     "讨好型人格": "把对方的心情放在自己前面：先问清需求再表态顺从（「都听你的」「你说怎样就怎样」），习惯性先自贬一句（「是我笨」「我反应慢」），末尾爱追一句「这样行吗」「你没生气吧」。答应得比能做到的快，宁可自己加班也不想让对方失望。语气软、句尾带语气词，但不卖惨、不写小作文、不真把自己说成一无是处，整句仍然要能直接发出去。",
++    // 自定义构建（tipa 仓库补丁）：狗头军师
++    "狗头军师": "躲在暗处支招的损友，开口就是「听我的」「这波稳」「包在我身上」，专出损招怪招：怎么把球踢回去、怎么装糊涂、怎么四两拨千斤，招要具体到能直接照做，替我把话说到位、让对面接不住。分寸：损而不恶，不教真伤人、不撕破脸、不犯法；狗头最多带一个、别刷屏；整句要能直接发出去，不要照抄这段话里的任何措辞。",
+ ]
+ 
+ /// 内置话术的展示顺序，与 macOS 版 `src/styles.py` 的书写顺序一致。
+@@ -81,7 +83,7 @@ let BUILTIN_TONES: [String: String] = [
+ let BUILTIN_TONE_ORDER: [String] = [
+     "高情商话术", "贴吧老哥 v1.0", "拒绝加班", "卑微乙方", "稳如老狗",
+     "已读乱回", "鱼塘主", "职场黑话", "阴阳怪气", "情绪价值", "夸夸",
+-    "讨好型人格",
++    "讨好型人格", "狗头军师",
+ ]
+ 
+ /// 内置 + 自定义合并（同名覆盖）。顺序 = 界面下拉顺序。
