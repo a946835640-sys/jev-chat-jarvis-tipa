@@ -1,8 +1,14 @@
 diff --git a/App/Sources/JevJarvisApp.swift b/App/Sources/JevJarvisApp.swift
-index 8336e44..91832e8 100644
+index 8336e44..266c5da 100644
 --- a/App/Sources/JevJarvisApp.swift
 +++ b/App/Sources/JevJarvisApp.swift
-@@ -41,6 +41,8 @@ struct JevJarvisApp: App {
+@@ -1,4 +1,5 @@
+ import SwiftUI
++import UIKit
+ 
+ /// 配置的唯一可写入口：App 侧改完立刻落 App Group，键盘下次分析就能读到。
+ @MainActor
+@@ -41,6 +42,8 @@ struct JevJarvisApp: App {
                      .tabItem { Label(jevLocalized(store.language, zh: "模型", en: "Models"), systemImage: "brain.head.profile") }
                  TonesView()
                      .tabItem { Label(jevLocalized(store.language, zh: "话术", en: "Tones"), systemImage: "theatermasks") }
@@ -11,7 +17,7 @@ index 8336e44..91832e8 100644
                  PlaygroundView()
                      .tabItem { Label(jevLocalized(store.language, zh: "试一试", en: "Try it"), systemImage: "flask") }
              }
-@@ -51,3 +53,91 @@ struct JevJarvisApp: App {
+@@ -51,3 +54,100 @@ struct JevJarvisApp: App {
          }
      }
  }
@@ -69,7 +75,16 @@ index 8336e44..91832e8 100644
 +                Text(jevLocalized(store.language, zh: "微信里长按消息 → 多选 → 合并转发 → 复制，粘贴到上面点「生成摘要」。原文只用于本次压缩，不会保存。", en: "Paste chat history (WeChat: select → merge forward → copy) and tap Summarize. The raw text is not stored."))
 +            }
 +        }
++        .scrollDismissesKeyboard(.immediately)
 +        .navigationTitle(jevLocalized(store.language, zh: "上下文", en: "Context"))
++        .toolbar {
++            ToolbarItemGroup(placement: .keyboard) {
++                Spacer()
++                Button(jevLocalized(store.language, zh: "收起键盘", en: "Dismiss")) {
++                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
++                }
++            }
++        }
 +    }
 +
 +    private func summarize() {
@@ -103,6 +118,50 @@ index 8336e44..91832e8 100644
 +        }
 +    }
 +}
+diff --git a/App/Sources/PlaygroundView.swift b/App/Sources/PlaygroundView.swift
+index 830f040..52af3d0 100644
+--- a/App/Sources/PlaygroundView.swift
++++ b/App/Sources/PlaygroundView.swift
+@@ -35,6 +35,7 @@ struct PlaygroundView: View {
+                     AnalysisResultView(analysis: a)
+                 }
+             }
++            .scrollDismissesKeyboard(.immediately)
+             .navigationTitle(jevLocalized(store.language, zh: "试一试", en: "Try it"))
+         }
+     }
+diff --git a/App/Sources/ProvidersView.swift b/App/Sources/ProvidersView.swift
+index e78be26..4d8268d 100644
+--- a/App/Sources/ProvidersView.swift
++++ b/App/Sources/ProvidersView.swift
+@@ -11,6 +11,7 @@ struct ProvidersView: View {
+                 judgeSection
+                 generationSection
+             }
++            .scrollDismissesKeyboard(.immediately)
+             .navigationTitle(jevLocalized(store.language, zh: "模型", en: "Models"))
+         }
+     }
+diff --git a/App/Sources/TonesView.swift b/App/Sources/TonesView.swift
+index 1de185d..9fb9600 100644
+--- a/App/Sources/TonesView.swift
++++ b/App/Sources/TonesView.swift
+@@ -12,6 +12,7 @@ struct TonesView: View {
+                 customSection
+                 previewSection
+             }
++            .scrollDismissesKeyboard(.immediately)
+             .navigationTitle(jevLocalized(store.language, zh: "话术", en: "Tones"))
+             .sheet(isPresented: $showAdd) { AddToneView() }
+         }
+@@ -106,6 +107,7 @@ private struct AddToneView: View {
+                 TextField(jevLocalized(store.language, zh: "说明（什么语气 + 别变成什么）", en: "Description (tone + what to avoid)"), text: $desc, axis: .vertical)
+                     .lineLimit(3...6)
+             }
++            .scrollDismissesKeyboard(.immediately)
+             .navigationTitle(jevLocalized(store.language, zh: "自定义话术", en: "Custom tone"))
+             .toolbar {
+                 ToolbarItem(placement: .cancellationAction) { Button(jevLocalized(store.language, zh: "取消", en: "Cancel")) { dismiss() } }
 diff --git a/Keyboard/Sources/KeyboardViewController.swift b/Keyboard/Sources/KeyboardViewController.swift
 index 4495edc..4042c42 100644
 --- a/Keyboard/Sources/KeyboardViewController.swift
